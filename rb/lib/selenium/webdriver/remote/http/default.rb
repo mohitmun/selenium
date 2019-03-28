@@ -19,6 +19,7 @@
 
 require 'net/https'
 require 'ipaddr'
+require 'net/http/persistent'
 
 module Selenium
   module WebDriver
@@ -122,20 +123,23 @@ module Selenium
           end
 
           def response_for(request)
-            http.request request
+            http.request server_url, request
           end
 
           def new_http_client
+            proxy = nil
             if use_proxy?
               url = @proxy.http
               raise Error::WebDriverError, "expected HTTP proxy, got #{@proxy.inspect}" unless proxy.respond_to?(:http) && url
 
               proxy = URI.parse(url)
+            end
 
-              clazz = Net::HTTP::Proxy(proxy.host, proxy.port, proxy.user, proxy.password)
-              clazz.new(server_url.host, server_url.port)
+            if Net::HTTP::Persistent::VERSION >= '3'
+              Net::HTTP::Persistent.new name: 'webdriver', proxy: proxy
             else
-              Net::HTTP.new server_url.host, server_url.port
+              WebDriver.logger.warn 'Support for this version of net-http-persistent is deprecated. Please upgrade.'
+              Net::HTTP::Persistent.new 'webdriver', proxy
             end
           end
 
